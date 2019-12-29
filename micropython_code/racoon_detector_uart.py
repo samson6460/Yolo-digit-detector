@@ -2,6 +2,7 @@ import sensor,image,lcd
 import KPU as kpu
 from fpioa_manager import fm
 from machine import UART
+from board import board_info
 
 lcd.init()
 sensor.reset()
