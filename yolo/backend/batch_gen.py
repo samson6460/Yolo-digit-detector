@@ -1,11 +1,11 @@
-
+import os
 import numpy as np
 np.random.seed(1337)
 from keras.utils import Sequence
 from .utils.augment import ImgAugment
 from .utils.box import to_centroid, create_anchor_boxes, find_match_box
-        
 
+import cv2
 def create_batch_generator(annotations, 
                            input_size=416,
                            grid_size=13,
@@ -79,6 +79,13 @@ class BatchGenerator(Sequence):
             # 2. read image in fixed size
             img, boxes = self._img_aug.imread(fname, boxes)
 
+            #image_copy = img
+            #for box in boxes:
+            #    x1, y1, x2, y2 = box
+            #    cv2.rectangle(image_copy, (x1,y1), (x2,y2), (0,255,0), 3)
+            #print(os.path.join('test',os.path.basename(fname)))
+            #cv2.imwrite(os.path.join('test',os.path.basename(fname)), image_copy)
+
             # 3. grid scaling centroid boxes
             norm_boxes = self._yolo_box.trans(boxes)
             
@@ -116,6 +123,7 @@ class _YoloBox(object):
         centroid_boxes = to_centroid(boxes).astype(np.float32)
         # 2. image scale -> grid scale
         norm_boxes = centroid_boxes * (self._grid_size / self._input_size)
+        #print(norm_boxes)
         return norm_boxes
 
 
@@ -159,7 +167,6 @@ class _NetoutGen(object):
         # loop over objects in one image
         for norm_box, label in zip(norm_boxes, labels):
             best_anchor = self._find_anchor_idx(norm_box)
-
             # assign ground truth x, y, w, h, confidence and class probs to y_batch
             y += self._generate_y(best_anchor, label, norm_box)
         return y
@@ -176,6 +183,8 @@ class _NetoutGen(object):
     def _generate_y(self, best_anchor, obj_indx, box):
         y = np.zeros(self._tensor_shape)
         grid_x, grid_y, _, _ = box.astype(int)
+        if grid_x > 6: grid_x = 6
+        if grid_y > 6: grid_y = 6
         y[grid_y, grid_x, best_anchor, 0:4] = box
         y[grid_y, grid_x, best_anchor, 4  ] = 1.
         y[grid_y, grid_x, best_anchor, 5+obj_indx] = 1

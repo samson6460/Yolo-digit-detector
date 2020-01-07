@@ -4,23 +4,35 @@ import time
 import tensorflow as tf
 import keras
 import numpy as np
-from keras.optimizers import Adam
+from keras import backend as K
+from tensorflow.python.framework import graph_util
+from tensorflow.python.framework import graph_io
+from keras.optimizers import Adam, SGD
 from keras.callbacks import EarlyStopping, ReduceLROnPlateau
+import matplotlib.pyplot as plt
+from datetime import datetime
 
+# define your custom callback for prediction
+class PredictionCallback(tf.keras.callbacks.Callback):    
+    def on_epoch_end(self, epoch, logs={}):
+        pass
 
 class CheckpointPB(keras.callbacks.Callback):
 
-    def __init__(self, filepath, monitor='val_loss', verbose=0,
+    def __init__(self, filepath, date, monitor='val_loss', verbose=0,
                  save_best_only=False, save_weights_only=False,
                  mode='auto', period=1):
         super(CheckpointPB, self).__init__()
         self.monitor = monitor
         self.verbose = verbose
         self.filepath = filepath
+        self.date = date
         self.save_best_only = save_best_only
         self.save_weights_only = save_weights_only
         self.period = period
         self.epochs_since_last_save = 0
+        self.loss = []
+        self.val_loss = []
 
         if mode not in ['auto', 'min', 'max']:
             warnings.warn('ModelCheckpoint mode %s is unknown, '
@@ -44,6 +56,9 @@ class CheckpointPB(keras.callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         logs = logs or {}
+        self.loss.append(logs.get("loss"))
+        self.val_loss.append(logs.get("val_loss"))
+        plot(self.loss,self.val_loss,self.filepath,self.date)
         self.epochs_since_last_save += 1
         if self.epochs_since_last_save >= self.period:
             self.epochs_since_last_save = 0
@@ -64,8 +79,8 @@ class CheckpointPB(keras.callbacks.Callback):
                         if self.save_weights_only:
                             self.model.save_weights(filepath, overwrite=True)
                         else:
-                            self.model.save(filepath, overwrite=True)
-                            save_tflite(self.model)
+                            self.model.save(os.path.join(self.filepath, self.date + '.h5'), overwrite=True)
+                            save_tflite(self.model, self.filepath, self.date)
                     else:
                         if self.verbose > 0:
                             print('\nEpoch %05d: %s did not improve from %0.5f' %
@@ -77,6 +92,7 @@ class CheckpointPB(keras.callbacks.Callback):
                     self.model.save_weights(filepath, overwrite=True)
                 else:
                     self.model.save(filepath, overwrite=True)
+
 
 
 def train(model,
@@ -100,44 +116,58 @@ def train(model,
     """
     # 1. create optimizer
     optimizer = Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
-    
+    #optimizer = SGD(lr=learning_rate, nesterov=True)
     # 2. create loss function
-    model.compile(loss=loss_func,
-                  optimizer=optimizer)
+    model.compile(loss=loss_func,optimizer=optimizer)
 
     # 4. training
     train_start = time.time()
+    train_date = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    name = ""
+    for item in saved_weights_name.split('/')[:-1]: name = os.path.join(name,item)
+    path = os.path.join(name,train_date)
+    os.mkdir(path)
+    saved_weights_name = os.path.join(path, train_date + '.h5')
     try:
-        model.fit_generator(generator = train_batch_gen,
+        history = model.fit_generator(generator = train_batch_gen,
                         steps_per_epoch  = len(train_batch_gen), 
                         epochs           = nb_epoch,
                         validation_data  = valid_batch_gen,
                         validation_steps = len(valid_batch_gen),
-                        callbacks        = _create_callbacks(saved_weights_name),                        
+                        callbacks        = _create_callbacks(path, train_date),                        
                         verbose          = 1,
-                        workers          = 3,
-                        max_queue_size   = 8)
+                        workers          = 2,
+                        max_queue_size   = 4)
     except KeyboardInterrupt:
-        save_tflite(model)
+        save_tflite(model,path,(train_date+"_ctrlc_"))
         raise
 
     _print_time(time.time()-train_start)
-    save_tflite(model)
+    save_tflite(model,path,(train_date+"_end_"))
+
 def _print_time(process_time):
     if process_time < 60:
         print("{:d}-seconds to train".format(int(process_time)))
     else:
         print("{:d}-mins to train".format(int(process_time/60)))
 
-def save_tflite(model):
-    #for n in tf.get_default_graph().as_graph_def().node:
-    #    print(n.name) 
-    model.save("model.h5",include_optimizer=False)
-    converter = tf.lite.TFLiteConverter.from_keras_model_file("model.h5",output_arrays=['detection_layer_30/BiasAdd'])
-    tflite_model = converter.convert()
-    open("model.tflite", "wb").write(tflite_model)
+def save_tflite(model, path, train_date):
+        output_node_names = [node.op.name for node in model.outputs]
+        input_node_names = [node.op.name for node in model.inputs]
+        sess = K.get_session()
+        constant_graph = graph_util.convert_variables_to_constants(sess, sess.graph.as_graph_def(), output_node_names)
+        graph_io.write_graph(constant_graph, "" , os.path.join (path, train_date + '.pb'), as_text=False)
 
-def _create_callbacks(saved_weights_name):
+def plot(acc,val_acc,path,train_date):
+    plt.plot(acc)
+    plt.plot(val_acc)
+    plt.title('Model loss')
+    plt.ylabel('Loss')
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Test'], loc='upper left')
+    plt.savefig(os.path.join(path, train_date +'.png'))
+
+def _create_callbacks(saved_weights_name, train_date):
     # Make a few callbacks
     early_stop = EarlyStopping(monitor='val_loss', 
                        min_delta=0.001, 
@@ -145,7 +175,7 @@ def _create_callbacks(saved_weights_name):
                        mode='min', 
                        verbose=1,
                        restore_best_weights=True)
-    checkpoint = CheckpointPB(saved_weights_name, 
+    checkpoint = CheckpointPB(saved_weights_name,train_date, 
                                  monitor='val_loss', 
                                  verbose=1, 
                                  save_best_only=True, 
@@ -153,5 +183,5 @@ def _create_callbacks(saved_weights_name):
                                  period=1)
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2,
                               patience=5, min_lr=0.00001,verbose=1)
-    callbacks = [early_stop, reduce_lr]
+    callbacks = [early_stop, checkpoint, reduce_lr]
     return callbacks

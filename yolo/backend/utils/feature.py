@@ -243,10 +243,7 @@ class MobileNetFeature(BaseFeatureExtractor):
     """docstring for ClassName"""
     def __init__(self, input_size, weights=False):
         input_image = Input(shape=(input_size, input_size, 3))
-        mobilenet = MobileNet(input_shape=(224,224,3),alpha = 0.75,depth_multiplier = 1, dropout = 0.001, weights = "imagenet", classes = 1000, include_top=False,backend=keras.backend, layers=keras.layers,models=keras.models,utils=keras.utils)
-        if weights:
-            mobilenet.load_weights('mobilenet_7_5_224_tf_no_top.h5')
-            print("Loading weights success")
+        mobilenet = MobileNet(input_shape=(224,224,3),alpha = 0.75,depth_multiplier = 1, dropout = 0.001, weights = 'imagenet', classes = 1000, include_top=False,backend=keras.backend, layers=keras.layers,models=keras.models,utils=keras.utils)
 
         x = mobilenet(input_image)
         self.feature_extractor = Model(input_image, x)  
@@ -360,7 +357,7 @@ class VGG16Feature(BaseFeatureExtractor):
 class ResNet50Feature(BaseFeatureExtractor):
     """docstring for ClassName"""
     def __init__(self, input_size, weights):
-        resnet50 = ResNet50(input_shape=(input_size, input_size, 3), include_top=False)
+        resnet50 = ResNet50(input_shape=(input_size, input_size, 3), include_top=False, pooling = 'avg')
         if weights:
             resnet50.load_weights(weights)
         resnet50.layers.pop() # remove the average pooling layer

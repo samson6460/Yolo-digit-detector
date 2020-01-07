@@ -121,7 +121,7 @@ class YOLO(object):
                                                                      valid_img_folder,
                                                                      valid_ann_folder,
                                                                      is_only_detect)
-        
+        print(img_folder)
         # 1. get batch generator
         train_batch_generator = self._get_batch_generator(train_annotations, batch_size, train_times, jitter=jitter)
         valid_batch_generator = self._get_batch_generator(valid_annotations, batch_size, valid_times, jitter=False)

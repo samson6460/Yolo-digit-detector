@@ -46,22 +46,37 @@ argparser.add_argument(
     default=DEFAULT_WEIGHT_FILE,
     help='trained weight files')
 
-def create_ann(filename, image, boxes, labels,label_list):
-    copyfile(os.path.join('tests/dataset/svhn/numbers_pics',filename), 'imgs/'+filename)
-    writer = Writer(os.path.join('tests/dataset/svhn/numbers_pics',filename), 224, 224)
-    writer.addObject(label_list[labels[0]], boxes[0][0], boxes[0][1], boxes[0][2], boxes[0][3])
+argparser.add_argument(
+    '-p',
+    '--path',
+    default='/home/ubuntu/datasets/traffic_sign_recognition/imgs_validation',
+    help='path to images')
+
+def create_ann(filename, image, boxes, right_label, label_list):
+    copyfile(os.path.join(args.path,filename), 'test_img/'+filename)
+    writer = Writer(os.path.join(args.path,filename), 224, 224)
+    print(right_label)
+    for i in range(len(right_label)):
+    	writer.addObject(label_list[right_label[i]], boxes[i][0], boxes[i][1], boxes[i][2], boxes[i][3])
     name = filename.split('.')
-    writer.save('ann/'+name[0]+'.xml')
+    writer.save('test_ann/'+name[0]+'.xml')
 
 if __name__ == '__main__':
     # 1. extract arguments
     args = argparser.parse_args()
     with open(args.conf) as config_buffer:
         config = json.loads(config_buffer.read())
-
+    if config['train']['is_only_detect']:
+        labels = ['']
+    else:
+        if config['model']['labels']:
+            labels = config['model']['labels']
+        else:
+            labels = get_object_labels(config['train']['train_annot_folder'])
+    print(labels)
     # 2. create yolo instance & predict
     yolo = create_yolo(config['model']['architecture'],
-                       config['model']['labels'],
+                       labels,
                        config['model']['input_size'],
                        config['model']['anchors'])
     yolo.load_weights(args.weights)
@@ -78,9 +93,9 @@ if __name__ == '__main__':
     #n_truth = 0
     #n_pred = 0
     #for i in range(len(annotations)):
-    for filename in os.listdir('tests/dataset/svhn/numbers_pics'):
+    for filename in os.listdir(args.path):
         #img_path = annotations.fname(i)
-        img_path = os.path.join('tests/dataset/svhn/numbers_pics',filename)
+        img_path = os.path.join(args.path,filename)
         #img_fname = os.path.basename(img_path)
         img_fname = filename
         image = cv2.imread(img_path)
@@ -88,16 +103,16 @@ if __name__ == '__main__':
         #true_labels = annotations.code_labels(i)
         
         boxes, probs = yolo.predict(image, float(args.threshold))
-        labels = np.argmax(probs, axis=1) if len(probs) > 0 else [] 
-      
+
         # 4. save detection result
-        image = draw_scaled_boxes(image, boxes, probs, config['model']['labels'])
+        image = draw_scaled_boxes(image, boxes, probs, labels)
         output_path = os.path.join(write_dname, os.path.split(img_fname)[-1])
         label_list = config['model']['labels']
+        right_label = np.argmax(probs, axis=1) if len(probs) > 0 else [] 
         #cv2.imwrite(output_path, image)
         print("{}-boxes are detected. {} saved.".format(len(boxes), output_path))
         if len(probs) > 0:
-            create_ann(filename,image,boxes,labels,label_list)
+            #create_ann(filename,image,boxes,right_label,label_list)
             cv2.imwrite(output_path, image)
 
         #n_true_positives += count_true_positives(boxes, true_boxes, labels, true_labels)

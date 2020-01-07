@@ -43,6 +43,8 @@ class YoloNetwork(object):
         self._model = model
         self._model.summary()
         self._init_layer()
+        layer_names = [layer.name for layer in self._model.layers]
+        print(layer_names)
 
     def _init_layer(self):
         layer = self._model.layers[-2]
