@@ -154,9 +154,14 @@ def _print_time(process_time):
 def save_tflite(model, path, train_date):
         output_node_names = [node.op.name for node in model.outputs]
         input_node_names = [node.op.name for node in model.inputs]
+        output_layer = model.layers[2].name+'/BiasAdd'
         sess = K.get_session()
         constant_graph = graph_util.convert_variables_to_constants(sess, sess.graph.as_graph_def(), output_node_names)
         graph_io.write_graph(constant_graph, "" , os.path.join (path, train_date + '.pb'), as_text=False)
+        model.save("tmp.h5",include_optimizer=False)
+        converter = tf.lite.TFLiteConverter.from_keras_model_file("tmp.h5",output_arrays=[output_layer])
+        tflite_model = converter.convert()
+        open(os.path.join (path, train_date + '.tflite'), "wb").write(tflite_model)
 
 def plot(acc,val_acc,path,train_date):
     plt.plot(acc)
