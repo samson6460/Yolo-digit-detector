@@ -8,7 +8,7 @@
 
 * python 3.6
 * tensorflow 1.14.0
-* keras 2.3.0
+* keras 2.2.4
 * opencv 3.3.0
 * Etc.
 
