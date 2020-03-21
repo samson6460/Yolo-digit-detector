@@ -1,4 +1,5 @@
 # Forked from SVHN yolo-v2 digit detector
+# This repository is depreciated now. For new version with more features, please go to https://github.com/AIWintermuteAI/aXeleRate
 
 ![Raccoon](https://cdn.instructables.com/FUW/ZFON/K0WP7IHC/FUWZFONK0WP7IHC.LARGE.jpg?auto=webp&width=1024&fit=bounds)
 
