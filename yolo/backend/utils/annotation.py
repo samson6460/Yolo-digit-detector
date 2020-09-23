@@ -72,8 +72,10 @@ class PascalVocXmlParser(object):
         # Returns
             filename : str
         """
-        root = self._root_tag(annotation_file)
-        return root.find("filename").text
+        fname = (os.path.splitext(
+            os.path.basename(annotation_file)
+            )[0]) + ".jpg"
+        return fname
 
     def get_width(self, annotation_file):
         """
