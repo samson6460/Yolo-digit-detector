@@ -80,7 +80,6 @@ class CheckpointPB(keras.callbacks.Callback):
                             self.model.save_weights(filepath, overwrite=True)
                         else:
                             self.model.save(os.path.join(self.filepath, self.date + '.h5'), overwrite=True)
-                            save_tflite(self.model, self.filepath, self.date)
                     else:
                         if self.verbose > 0:
                             print('\nEpoch %05d: %s did not improve from %0.5f' %
@@ -139,11 +138,11 @@ def train(model,
                         workers          = 2,
                         max_queue_size   = 4)
     except KeyboardInterrupt:
-        save_tflite(model,path,(train_date+"_ctrlc_"))
+        save_tflite(path,train_date,"_ctrlc_")
         raise
 
     _print_time(time.time()-train_start)
-    save_tflite(model,path,(train_date+"_end_"))
+    save_tflite(path,train_date,"_end_")
 
 def _print_time(process_time):
     if process_time < 60:
@@ -151,7 +150,7 @@ def _print_time(process_time):
     else:
         print("{:d}-mins to train".format(int(process_time/60)))
 
-def save_tflite(model, path, train_date):
+def save_tflite(path, train_date, end=""):
         def loss_func(y_true, y_pred):
             return y_true - y_pred
         keras_model_path = os.path.join(path, train_date + '.h5')
@@ -159,7 +158,7 @@ def save_tflite(model, path, train_date):
             keras_model_path,
             custom_objects={'loss_func': loss_func})
         tflite_model = converter.convert()
-        open(os.path.join (path, train_date + '.tflite'), "wb").write(tflite_model)
+        open(os.path.join (path, train_date + end + '.tflite'), "wb").write(tflite_model)
 
 def plot(acc,val_acc,path,train_date):
     plt.plot(acc)
