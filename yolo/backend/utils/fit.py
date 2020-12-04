@@ -127,6 +127,7 @@ def train(model,
     path = os.path.join(name,train_date)
     os.mkdir(path)
     saved_weights_name = os.path.join(path, train_date + '.h5')
+    output_layer = model.layers[-2].name+'/BiasAdd'
     try:
         history = model.fit_generator(generator = train_batch_gen,
                         steps_per_epoch  = len(train_batch_gen), 
@@ -138,11 +139,11 @@ def train(model,
                         workers          = 2,
                         max_queue_size   = 4)
     except KeyboardInterrupt:
-        save_tflite(path,train_date,"_ctrlc_")
+        save_tflite(path, train_date, output_layer, "_ctrlc_")
         raise
 
     _print_time(time.time()-train_start)
-    save_tflite(path,train_date,"_end_")
+    save_tflite(path, train_date, output_layer, "_end_")
 
 def _print_time(process_time):
     if process_time < 60:
@@ -150,15 +151,16 @@ def _print_time(process_time):
     else:
         print("{:d}-mins to train".format(int(process_time/60)))
 
-def save_tflite(path, train_date, end=""):
+def save_tflite(path, train_date, output_layer, end=""):
         def loss_func(y_true, y_pred):
             return y_true - y_pred
         keras_model_path = os.path.join(path, train_date + '.h5')
         converter = tf.lite.TFLiteConverter.from_keras_model_file(
             keras_model_path,
+            output_arrays=[output_layer],
             custom_objects={'loss_func': loss_func})
         tflite_model = converter.convert()
-        open(os.path.join (path, train_date + end + '.tflite'), "wb").write(tflite_model)
+        open(os.path.join(path, train_date + end + '.tflite'), "wb").write(tflite_model)
 
 def plot(acc,val_acc,path,train_date):
     plt.plot(acc)
