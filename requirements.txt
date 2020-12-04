@@ -9,3 +9,4 @@ sklearn
 pytest-cov
 codecov
 matplotlib
+pascal_voc_writer
